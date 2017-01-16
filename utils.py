@@ -559,7 +559,6 @@ class BehaviourCloningDirectoryIterator(Iterator):
         # build batch of image data
         for i, j in enumerate(index_array):
             fname = self.directory[j]
-            print("fname={}".format(fname))
             img = load_img(fname,
                            grayscale=grayscale,
                            target_size=self.target_size)
