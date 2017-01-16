@@ -9,6 +9,7 @@ import tensorflow as tf
 from PIL import Image
 from flask import Flask
 from keras.models import model_from_json
+import json
 
 tf.python.control_flow_ops = tf
 
@@ -65,7 +66,8 @@ if __name__ == '__main__':
                         help='Path to model definition json. Model weights should be on the same path.')
     args = parser.parse_args()
     with open(args.model, 'r') as jfile:
-        model = model_from_json(jfile.read())
+        str = json.load(jfile)
+        model = model_from_json(str)
 
     model.compile("adam", "mse")
     weights_file = args.model.replace('json', 'h5')
