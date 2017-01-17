@@ -130,7 +130,7 @@ json_file = 'model.json'
 weight_file = 'model.h5'
 if Path(json_file).is_file():
     with open(json_file, 'r') as jfile:
-        model = model_from_json(json.load(jfile))
+        model = model_from_json(json.loads(jfile.read()))
     adam = Adam(lr=0.00001, beta_1=0.9, beta_2=0.999, epsilon=1e-08, decay=0.01)
     model.compile(optimizer=adam, loss="mse")
     model.load_weights(weight_file)
