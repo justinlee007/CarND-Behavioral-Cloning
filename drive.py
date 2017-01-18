@@ -1,7 +1,9 @@
 import argparse
 import base64
+import json
 from io import BytesIO
 
+import cv2
 import eventlet.wsgi
 import numpy as np
 import socketio
@@ -9,7 +11,6 @@ import tensorflow as tf
 from PIL import Image
 from flask import Flask
 from keras.models import model_from_json
-import json
 
 tf.python.control_flow_ops = tf
 
@@ -40,10 +41,15 @@ def telemetry(sid, data):
     imgString = data["image"]
     image = Image.open(BytesIO(base64.b64decode(imgString)))
     asarray = np.asarray(image)
-    image_array = asarray
+    image_array = cv2.resize(asarray, (32, 16))
     transformed_image_array = image_array[None, :, :, :]
+    # print("steering_angle={}, throttle={}, speed={}, transformed_image_array size={}".format(
+    #     steering_angle,
+    #     throttle,
+    #     speed,
+    #     sys.getsizeof(transformed_image_array)))
     # This model currently assumes that the features of the model are just the images. Feel free to change this.
-    steering_angle = float(model.predict(transformed_image_array, batch_size=1))
+    steering_angle = 1.0 * float(model.predict(transformed_image_array, batch_size=1))
     # The driving model currently just outputs a constant throttle. Feel free to edit this.
     throttle = 0.2
     print(steering_angle, throttle)

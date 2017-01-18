@@ -1,4 +1,5 @@
 import csv
+import json
 import sys
 
 import cv2
@@ -7,15 +8,15 @@ from keras.layers import Dense, Dropout, Activation, Flatten
 from keras.layers import Lambda, Convolution2D, MaxPooling2D
 from keras.models import Sequential
 from keras.optimizers import Adam
+from sklearn.model_selection import train_test_split
 
 
 def create_model():
     model = Sequential()
-    # input: 100x100 images with 3 channels -> (3, 100, 100) tensors.
-    # this applies 32 convolution filters of size 3x3 each.
-    # model.add(Convolution2D(32, 3, 3, border_mode='valid', input_shape=(3, 100, 100)))
     input_shape = (16, 32, 3)
     model.add(Lambda(lambda x: x / 255. - 0.5, input_shape=input_shape))
+
+    # this applies 32 convolution filters of size 3x3 each.
     model.add(Convolution2D(32, 3, 3, border_mode='valid', input_shape=input_shape))
     model.add(Activation('relu'))
     model.add(Convolution2D(32, 3, 3))
@@ -55,8 +56,6 @@ def process_image(filename, flip=False):
     # cv2.destroyAllWindows()
     if flip:
         image = cv2.flip(image, 1)
-    # Normalization now done in graph
-    # normalized_image = normalize_image(image)
     # final_image = image[np.newaxis, ...]
     # print("final_image={}".format(final_image))
     # return final_image
@@ -65,6 +64,7 @@ def process_image(filename, flip=False):
 
 def read_csvfile(filename="driving_log.csv"):
     # Read driving_log.csv
+    # 0=img_left_file, 1=img_center_file, 2=img_right_file, 3=steering, img_left, img_center, img_right
     img_list = []
     pose_list = []
     with open(filename, "rt") as csvfile:
@@ -75,26 +75,38 @@ def read_csvfile(filename="driving_log.csv"):
             img_center_file = row[1].strip()
             img_center = process_image(img_center_file, False)
             img_list.append(img_center)
-            pose_list.append(float(row[3]))
-            # break
+            steering = float(row[3])
+            pose_list.append(steering)
+            if steering != 0.0:
+                img_center_flip = process_image(img_center_file, True)
+                img_list.append(img_center_flip)
+                pose_list.append(-1 * steering)
     pose_dict = {"steering": pose_list, "img_center": img_list}
     return pose_dict
 
 
-# 0=img_left_file, 1=img_center_file, 2=img_right_file, 3=steering, img_left, img_center, img_right
-
 if __name__ == '__main__':
     pose_dict = read_csvfile()
-    model = create_model()
-    adam = Adam(lr=0.00001, beta_1=0.9, beta_2=0.999, epsilon=1e-08, decay=0.01)
-    model.compile(optimizer="adam", loss="mse")
-    # model.compile(optimizer=adam, loss="mse")
+
     img_array = np.array(pose_dict["img_center"])
     ste_array = np.array(pose_dict["steering"], dtype=np.float32)
-
     print("total entries={} size={}".format(len(img_array), sys.getsizeof(img_array)))
     # print("img_array={}, ste_array={}".format(img_array, ste_array))
     # final_angle = np.ndarray(shape=(1), dtype=float)
     # final_angle[0] = ste
 
-    history = model.fit(img_array, ste_array)
+    X_train, X_val, Y_train, Y_val = train_test_split(img_array, ste_array, test_size=0.1, random_state=10)
+    print("X_train={}, X_val={}, Y_train={}, Y_val={}".format(len(X_train), len(X_val), len(Y_train), len(Y_val)))
+
+    model = create_model()
+    adam = Adam(lr=1e-4, beta_1=0.9, beta_2=0.999, epsilon=1e-08, decay=0.01)
+    # model.compile(optimizer="adam", loss="mse")
+    model.compile(optimizer=adam, loss="mse")
+
+    history = model.fit(X_train, Y_train, validation_data=(X_val, Y_val))
+
+    model_json = model.to_json()
+    with open("./model.json", "w") as json_file:
+        json.dump(model_json, json_file)
+    model.save_weights("./model.h5")
+    print("Saved model to disk")
