@@ -60,6 +60,30 @@ def process_image(filename, flip=False):
     return image
 
 
+"""
+def get_next_image_angle_pair(image_list):
+    index = 0
+    while 1:
+        final_images = np.ndarray(shape=(batch_size, image_sizeY, image_sizeX, num_channels), dtype=float)
+        final_angles = np.ndarray(shape=(batch_size), dtype=float)
+        for i in range(batch_size):
+            if index >= len(image_list):
+                index = 0
+                # Shuffle X_train after every epoch
+                shuffle(image_list)
+            filename = image_list[index][0]
+            angle = image_list[index][1]
+            flip = image_list[index][2]
+            final_image = process_image(filename, flip)
+            final_angle = np.ndarray(shape=(1), dtype=float)
+            final_angle[0] = angle
+            final_images[i] = final_image
+            final_angles[i] = angle
+            index += 1
+        yield ({'batchnormalization_input_1' : final_images}, {'output' : final_angles})
+"""
+
+
 def read_csvfile(filename="driving_log.csv"):
     print("Reading {} and processing images".format(filename))
     # 0=img_left_file, 1=img_center_file, 2=img_right_file, 3=steering, img_left, img_center, img_right
@@ -70,15 +94,36 @@ def read_csvfile(filename="driving_log.csv"):
         for index, row in enumerate(posereader):
             if index == 0:
                 continue
+            # img_left_file = row[0].strip()
             img_center_file = row[1].strip()
-            img_center = process_image(img_center_file, False)
-            img_list.append(img_center)
+            # img_right_file = row[2].strip()
             steering = float(row[3])
+
+            # img_left = process_image(img_left_file, False)
+            img_center = process_image(img_center_file, False)
+            # img_right = process_image(img_right_file, False)
+
+            # steering_left = steering + 0.20
+            # steering_right = steering - 0.20
+
+            # img_list.append(img_left)
+            # pose_list.append(steering_left)
+            img_list.append(img_center)
             pose_list.append(steering)
+            # img_list.append(img_right)
+            # pose_list.append(steering_right)
             if steering != 0.0:
+                # img_left_flip = process_image(img_left_file, True)
                 img_center_flip = process_image(img_center_file, True)
+                # img_right_flip = process_image(img_right_file, True)
+
+                # img_list.append(img_left_flip)
+                # pose_list.append(-1 * steering_left)
                 img_list.append(img_center_flip)
                 pose_list.append(-1 * steering)
+                # img_list.append(img_right_flip)
+                # pose_list.append(-1 * steering_right)
+
     pose_dict = {"steering": pose_list, "img_center": img_list}
     return pose_dict
 
