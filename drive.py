@@ -5,6 +5,7 @@ from io import BytesIO
 
 import cv2
 import eventlet.wsgi
+import keras.backend.tensorflow_backend as backend
 import numpy as np
 import socketio
 import tensorflow as tf
@@ -71,6 +72,10 @@ if __name__ == '__main__':
     parser.add_argument('model', type=str,
                         help='Path to model definition json. Model weights should be on the same path.')
     args = parser.parse_args()
+
+    config = backend.tf.ConfigProto()
+    config.gpu_options.allow_growth = True
+
     with open(args.model, 'r') as jfile:
         str = json.load(jfile)
         model = model_from_json(str)

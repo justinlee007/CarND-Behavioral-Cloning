@@ -3,6 +3,7 @@ import json
 import sys
 
 import cv2
+import keras.backend.tensorflow_backend as backend
 import numpy as np
 from keras.layers import Dense, Dropout, Activation, Flatten
 from keras.layers import Lambda, Convolution2D, MaxPooling2D
@@ -56,14 +57,11 @@ def process_image(filename, flip=False):
     # cv2.destroyAllWindows()
     if flip:
         image = cv2.flip(image, 1)
-    # final_image = image[np.newaxis, ...]
-    # print("final_image={}".format(final_image))
-    # return final_image
     return image
 
 
 def read_csvfile(filename="driving_log.csv"):
-    # Read driving_log.csv
+    print("Reading {} and processing images".format(filename))
     # 0=img_left_file, 1=img_center_file, 2=img_right_file, 3=steering, img_left, img_center, img_right
     img_list = []
     pose_list = []
@@ -91,22 +89,24 @@ if __name__ == '__main__':
     img_array = np.array(pose_dict["img_center"])
     ste_array = np.array(pose_dict["steering"], dtype=np.float32)
     print("total entries={} size={}".format(len(img_array), sys.getsizeof(img_array)))
-    # print("img_array={}, ste_array={}".format(img_array, ste_array))
-    # final_angle = np.ndarray(shape=(1), dtype=float)
-    # final_angle[0] = ste
 
     X_train, X_val, Y_train, Y_val = train_test_split(img_array, ste_array, test_size=0.1, random_state=10)
     print("X_train={}, X_val={}, Y_train={}, Y_val={}".format(len(X_train), len(X_val), len(Y_train), len(Y_val)))
 
+    config = backend.tf.ConfigProto()
+    config.gpu_options.allow_growth = True
+
     model = create_model()
     adam = Adam(lr=1e-4, beta_1=0.9, beta_2=0.999, epsilon=1e-08, decay=0.01)
-    # model.compile(optimizer="adam", loss="mse")
     model.compile(optimizer=adam, loss="mse")
 
     history = model.fit(X_train, Y_train, validation_data=(X_val, Y_val))
 
+    model_file = "./model.json"
     model_json = model.to_json()
-    with open("./model.json", "w") as json_file:
+    with open(model_file, "w") as json_file:
         json.dump(model_json, json_file)
-    model.save_weights("./model.h5")
-    print("Saved model to disk")
+    print("Saved {} to disk".format(model_file))
+    weights_file = "./model.h5"
+    model.save_weights(weights_file)
+    print("Saved {} to disk".format(weights_file))
