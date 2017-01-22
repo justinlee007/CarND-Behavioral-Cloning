@@ -29,6 +29,9 @@ from flask import Flask, render_template
 from keras.preprocessing.image import ImageDataGenerator, array_to_img, img_to_array
 """
 
+SCALE_X = 80
+SCALE_Y = 40
+
 
 @sio.on('telemetry')
 def telemetry(sid, data):
@@ -42,7 +45,7 @@ def telemetry(sid, data):
     imgString = data["image"]
     image = Image.open(BytesIO(base64.b64decode(imgString)))
     asarray = np.asarray(image)
-    image_array = cv2.resize(asarray, (32, 16))
+    image_array = cv2.resize(asarray, (SCALE_X, SCALE_Y))
     transformed_image_array = image_array[None, :, :, :]
     # print("steering_angle={}, throttle={}, speed={}, transformed_image_array size={}".format(
     #     steering_angle,
@@ -52,7 +55,7 @@ def telemetry(sid, data):
     # This model currently assumes that the features of the model are just the images. Feel free to change this.
     steering_angle = 1.0 * float(model.predict(transformed_image_array, batch_size=1))
     # The driving model currently just outputs a constant throttle. Feel free to edit this.
-    throttle = 0.15
+    throttle = 0.175
     print(steering_angle, throttle)
     send_control(steering_angle, throttle)
 

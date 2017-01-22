@@ -1,31 +1,36 @@
 import csv
 import json
+import math
 import sys
 
 import cv2
 import keras.backend.tensorflow_backend as backend
 import numpy as np
-from keras.layers import Dense, Dropout, Activation, Flatten
-from keras.layers import Lambda, Convolution2D, MaxPooling2D
+from keras.layers import Dense, Dropout, Activation, Flatten, ELU, Lambda, Convolution2D, MaxPooling2D
 from keras.models import Sequential
 from keras.optimizers import Adam
+from keras.regularizers import l2
 from sklearn.model_selection import train_test_split
+from sklearn.utils import shuffle
+
+SCALE_X = 80
+SCALE_Y = 40
 
 
 def create_model():
     model = Sequential()
-    input_shape = (16, 32, 3)
+    input_shape = (SCALE_Y, SCALE_X, 3)
     model.add(Lambda(lambda x: x / 255. - 0.5, input_shape=input_shape))
 
     # this applies 32 convolution filters of size 3x3 each.
-    model.add(Convolution2D(32, 3, 3, border_mode='valid', input_shape=input_shape))
+    model.add(Convolution2D(32, 3, 3, input_shape=input_shape))
     model.add(Activation('relu'))
     model.add(Convolution2D(32, 3, 3))
     model.add(Activation('relu'))
     model.add(MaxPooling2D(pool_size=(2, 2)))
     model.add(Dropout(0.25))
 
-    model.add(Convolution2D(64, 3, 3, border_mode='valid'))
+    model.add(Convolution2D(64, 3, 3))
     model.add(Activation('relu'))
     model.add(Convolution2D(64, 3, 3))
     model.add(Activation('relu'))
@@ -47,11 +52,97 @@ def create_model():
     return model
 
 
+def create_model_2():
+    model = Sequential()
+
+    input_shape = (SCALE_Y, SCALE_X, 3)
+
+    model.add(Lambda(lambda x: x / 128. - 1., output_shape=input_shape, input_shape=input_shape))
+    model.add(Convolution2D(24, 5, 5,
+                            subsample=(2, 2),
+                            W_regularizer=l2(0.00),
+                            input_shape=input_shape))
+    model.add(Activation('relu'))
+
+    model.add(Convolution2D(36, 5, 5, subsample=(2, 2), W_regularizer=l2(0.00)))
+    model.add(Dropout(0.4))
+    model.add(Activation('relu'))
+
+    model.add(Convolution2D(48, 5, 5, subsample=(2, 2), W_regularizer=l2(0.00)))
+    model.add(Dropout(0.4))
+    model.add(Activation('relu'))
+
+    model.add(Convolution2D(64, 3, 3, W_regularizer=l2(0.00)))
+    model.add(Dropout(0.4))
+    model.add(Activation('relu'))
+
+    model.add(Convolution2D(64, 3, 3, W_regularizer=l2(0.00)))
+    model.add(Dropout(0.4))
+    model.add(Activation('relu'))
+
+    model.add(Flatten())
+    model.add(Dense(100, input_shape=(2496,), W_regularizer=l2(0.00)))
+    model.add(Activation('relu'))
+
+    model.add(Dense(50, W_regularizer=l2(0.00)))
+    model.add(Activation('relu'))
+
+    model.add(Dense(1, W_regularizer=l2(0.00)))
+    model.summary()
+    return model
+
+
+def create_model_3():
+    input_shape = (SCALE_Y, SCALE_X, 3)
+    model = Sequential()
+    model.add(Lambda(lambda x: x / 255. - 0.5, input_shape=input_shape))
+    model.add(Convolution2D(3, 1, 1, init='he_normal'))
+
+    model.add(Convolution2D(32, 3, 3, init='he_normal'))
+    model.add(ELU())
+    model.add(Convolution2D(32, 3, 3, init='he_normal'))
+    model.add(ELU())
+    model.add(MaxPooling2D())
+    model.add(Dropout(0.5))
+
+    model.add(Convolution2D(64, 3, 3, init='he_normal'))
+    model.add(ELU())
+    model.add(Convolution2D(64, 3, 3, init='he_normal'))
+    model.add(ELU())
+    model.add(MaxPooling2D())
+    model.add(Dropout(0.5))
+
+    model.add(Convolution2D(128, 3, 3, init='he_normal'))
+    model.add(ELU())
+    model.add(Convolution2D(128, 3, 3, init='he_normal'))
+    model.add(ELU())
+    model.add(MaxPooling2D())
+    model.add(Dropout(0.5))
+
+    model.add(Flatten())
+
+    model.add(Dense(512, init='he_normal'))
+    model.add(ELU())
+    model.add(Dropout(0.5))
+
+    model.add(Dense(64, init='he_normal'))
+    model.add(ELU())
+    model.add(Dropout(0.5))
+
+    model.add(Dense(16, init='he_normal'))
+    model.add(ELU())
+    model.add(Dropout(0.5))
+
+    model.add(Dense(1, init='he_normal'))
+    model.summary()
+    return model
+
+
 # Read in the image, flip in necessary
 def process_image(filename, flip=False):
     # print("Reading image file {}".format(filename))
     image = cv2.imread(filename)
-    image = cv2.resize(image, (32, 16))
+    image = cv2.resize(image, (SCALE_X, SCALE_Y))
     # cv2.imshow("image", image)
     # cv2.waitKey(0)
     # cv2.destroyAllWindows()
@@ -60,28 +151,19 @@ def process_image(filename, flip=False):
     return image
 
 
-"""
-def get_next_image_angle_pair(image_list):
+def batch_generator(img_array, ste_array, batch_size=32):
     index = 0
     while 1:
-        final_images = np.ndarray(shape=(batch_size, image_sizeY, image_sizeX, num_channels), dtype=float)
-        final_angles = np.ndarray(shape=(batch_size), dtype=float)
+        batch_img_array = np.ndarray(shape=(batch_size, SCALE_Y, SCALE_X, 3), dtype=float)
+        batch_ste_array = np.ndarray(shape=(batch_size), dtype=float)
         for i in range(batch_size):
-            if index >= len(image_list):
+            if index >= len(img_array):
                 index = 0
-                # Shuffle X_train after every epoch
-                shuffle(image_list)
-            filename = image_list[index][0]
-            angle = image_list[index][1]
-            flip = image_list[index][2]
-            final_image = process_image(filename, flip)
-            final_angle = np.ndarray(shape=(1), dtype=float)
-            final_angle[0] = angle
-            final_images[i] = final_image
-            final_angles[i] = angle
+                shuffle(img_array, ste_array)
+            batch_img_array[i] = img_array[index]
+            batch_ste_array[i] = ste_array[index]
             index += 1
-        yield ({'batchnormalization_input_1' : final_images}, {'output' : final_angles})
-"""
+        yield batch_img_array, batch_ste_array
 
 
 def read_csvfile(filename="driving_log.csv"):
@@ -90,28 +172,28 @@ def read_csvfile(filename="driving_log.csv"):
     img_list = []
     pose_list = []
     with open(filename, "rt") as csvfile:
-        posereader = csv.reader(csvfile, delimiter=',')
-        for index, row in enumerate(posereader):
+        pose_reader = csv.reader(csvfile, delimiter=',')
+        for index, row in enumerate(pose_reader):
             if index == 0:
                 continue
-            # img_left_file = row[0].strip()
+            img_left_file = row[0].strip()
             img_center_file = row[1].strip()
-            # img_right_file = row[2].strip()
+            img_right_file = row[2].strip()
             steering = float(row[3])
 
-            # img_left = process_image(img_left_file, False)
+            img_left = process_image(img_left_file, False)
             img_center = process_image(img_center_file, False)
-            # img_right = process_image(img_right_file, False)
+            img_right = process_image(img_right_file, False)
 
-            # steering_left = steering + 0.20
-            # steering_right = steering - 0.20
+            steering_left = steering + 0.15
+            steering_right = steering - 0.15
 
-            # img_list.append(img_left)
-            # pose_list.append(steering_left)
+            img_list.append(img_left)
+            pose_list.append(steering_left)
             img_list.append(img_center)
             pose_list.append(steering)
-            # img_list.append(img_right)
-            # pose_list.append(steering_right)
+            img_list.append(img_right)
+            pose_list.append(steering_right)
             if steering != 0.0:
                 # img_left_flip = process_image(img_left_file, True)
                 img_center_flip = process_image(img_center_file, True)
@@ -126,6 +208,15 @@ def read_csvfile(filename="driving_log.csv"):
 
     pose_dict = {"steering": pose_list, "img_center": img_list}
     return pose_dict
+
+
+# Calculate the correct number of samples per epoch based on batch size
+def calc_samples_per_epoch(array_size, batch_size):
+    num_batches = array_size / batch_size
+    # return value must be a number than can be divided by batch_size
+    samples_per_epoch = math.ceil((num_batches / batch_size) * batch_size)
+    samples_per_epoch = samples_per_epoch * batch_size
+    return samples_per_epoch
 
 
 if __name__ == '__main__':
@@ -145,7 +236,22 @@ if __name__ == '__main__':
     adam = Adam(lr=1e-4, beta_1=0.9, beta_2=0.999, epsilon=1e-08, decay=0.01)
     model.compile(optimizer=adam, loss="mse")
 
-    history = model.fit(X_train, Y_train, validation_data=(X_val, Y_val))
+    batch_size = 64
+    samples_per_epoch = calc_samples_per_epoch(len(X_train), batch_size)
+
+    history = model.fit_generator(
+        batch_generator(X_train, Y_train, batch_size=batch_size),
+        samples_per_epoch=samples_per_epoch,
+        nb_epoch=10,
+        validation_data=batch_generator(X_val, Y_val, batch_size=batch_size),
+        nb_val_samples=len(X_val))
+
+    # Evaluate the accuracy of the model using the test set
+    # accuracy = model.evaluate_generator(
+    #     generator=batch_generator(img_array, ste_array),  # validation data generator
+    #     val_samples=calc_samples_per_epoch(len(img_array), batch_size),  # How many batches to run in one epoch
+    # )
+    # print("Accuracy={}".format(accuracy))
 
     model_file = "./model.json"
     model_json = model.to_json()
