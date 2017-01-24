@@ -1,3 +1,4 @@
+import argparse
 import csv
 import json
 import math
@@ -7,14 +8,17 @@ import cv2
 import keras.backend.tensorflow_backend as backend
 import numpy as np
 from keras.layers import Dense, Dropout, Activation, Flatten, ELU, Lambda, Convolution2D, MaxPooling2D
-from keras.models import Sequential
+from keras.models import Sequential, model_from_json
 from keras.optimizers import Adam
 from keras.regularizers import l2
 from sklearn.model_selection import train_test_split
 from sklearn.utils import shuffle
 
-SCALE_X = 80
-SCALE_Y = 40
+SCALE_X = 72
+SCALE_Y = 36
+PROCESS_SIDES = True
+SIDE_ANGLE_OFFSET = 0.1
+USE_FLIP = True
 
 
 def create_model():
@@ -27,14 +31,14 @@ def create_model():
     model.add(Activation('relu'))
     model.add(Convolution2D(32, 3, 3))
     model.add(Activation('relu'))
-    model.add(MaxPooling2D(pool_size=(2, 2)))
+    model.add(MaxPooling2D())
     model.add(Dropout(0.25))
 
     model.add(Convolution2D(64, 3, 3))
     model.add(Activation('relu'))
     model.add(Convolution2D(64, 3, 3))
     model.add(Activation('relu'))
-    model.add(MaxPooling2D(pool_size=(2, 2)))
+    model.add(MaxPooling2D())
     model.add(Dropout(0.25))
 
     model.add(Flatten())
@@ -153,7 +157,7 @@ def process_image(filename, flip=False):
 
 def batch_generator(img_array, ste_array, batch_size=32):
     index = 0
-    while 1:
+    while True:
         batch_img_array = np.ndarray(shape=(batch_size, SCALE_Y, SCALE_X, 3), dtype=float)
         batch_ste_array = np.ndarray(shape=(batch_size), dtype=float)
         for i in range(batch_size):
@@ -181,30 +185,25 @@ def read_csvfile(filename="driving_log.csv"):
             img_right_file = row[2].strip()
             steering = float(row[3])
 
-            img_left = process_image(img_left_file, False)
             img_center = process_image(img_center_file, False)
-            img_right = process_image(img_right_file, False)
-
-            steering_left = steering + 0.15
-            steering_right = steering - 0.15
-
-            img_list.append(img_left)
-            pose_list.append(steering_left)
             img_list.append(img_center)
             pose_list.append(steering)
-            img_list.append(img_right)
-            pose_list.append(steering_right)
-            if steering != 0.0:
-                # img_left_flip = process_image(img_left_file, True)
-                img_center_flip = process_image(img_center_file, True)
-                # img_right_flip = process_image(img_right_file, True)
 
-                # img_list.append(img_left_flip)
-                # pose_list.append(-1 * steering_left)
+            if (PROCESS_SIDES):
+                img_left = process_image(img_left_file, False)
+                img_right = process_image(img_right_file, False)
+
+                steering_left = steering + SIDE_ANGLE_OFFSET
+                steering_right = steering - SIDE_ANGLE_OFFSET
+
+                img_list.append(img_left)
+                pose_list.append(steering_left)
+                img_list.append(img_right)
+                pose_list.append(steering_right)
+            if USE_FLIP and steering != 0.0:
+                img_center_flip = process_image(img_center_file, True)
                 img_list.append(img_center_flip)
                 pose_list.append(-1 * steering)
-                # img_list.append(img_right_flip)
-                # pose_list.append(-1 * steering_right)
 
     pose_dict = {"steering": pose_list, "img_center": img_list}
     return pose_dict
@@ -220,6 +219,12 @@ def calc_samples_per_epoch(array_size, batch_size):
 
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description="LeNet Architecture for GTSRB dataset")
+    parser.add_argument("-tune", action="store", dest="fine_tune", default=False, help="Start in fine-tune mode")
+    parser.add_argument("-flip", action="store", dest="use_flip", default=True, help="Flip center data")
+    results = parser.parse_args()
+    fine_tune = results.fine_tune
+    USE_FLIP = results.use_flip
     pose_dict = read_csvfile()
 
     img_array = np.array(pose_dict["img_center"])
@@ -232,11 +237,25 @@ if __name__ == '__main__':
     config = backend.tf.ConfigProto()
     config.gpu_options.allow_growth = True
 
-    model = create_model()
-    adam = Adam(lr=1e-4, beta_1=0.9, beta_2=0.999, epsilon=1e-08, decay=0.01)
+    model_file = "./model.json"
+    weights_file = "./model.h5"
+
+    if fine_tune is True:
+        learning_rate = 1e-6
+        print("Fine tuning model at rate={}, flip={}".format(learning_rate, USE_FLIP))
+        with open(model_file, 'r') as json_file:
+            model = model_from_json(json.load(json_file))
+        model.compile("adam", "mse")
+        model.load_weights(weights_file)
+    else:
+        learning_rate = 1e-4
+        print("Training model at rate={}, flip={}".format(learning_rate, USE_FLIP))
+        model = create_model()
+
+    adam = Adam(lr=learning_rate, decay=0.01)
     model.compile(optimizer=adam, loss="mse")
 
-    batch_size = 64
+    batch_size = 32
     samples_per_epoch = calc_samples_per_epoch(len(X_train), batch_size)
 
     history = model.fit_generator(
@@ -253,11 +272,9 @@ if __name__ == '__main__':
     # )
     # print("Accuracy={}".format(accuracy))
 
-    model_file = "./model.json"
     model_json = model.to_json()
     with open(model_file, "w") as json_file:
         json.dump(model_json, json_file)
     print("Saved {} to disk".format(model_file))
-    weights_file = "./model.h5"
     model.save_weights(weights_file)
     print("Saved {} to disk".format(weights_file))
