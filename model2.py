@@ -7,16 +7,17 @@ import sys
 import cv2
 import keras.backend.tensorflow_backend as backend
 import numpy as np
-from keras.layers import Dense, Dropout, Activation, Flatten, ELU, Lambda, Convolution2D, MaxPooling2D
+from keras.layers import Dense, Dropout, Activation, Flatten, ELU, Lambda, Convolution2D, MaxPooling2D, \
+    BatchNormalization
 from keras.models import Sequential, model_from_json
 from keras.optimizers import Adam
 from keras.regularizers import l2
 from sklearn.model_selection import train_test_split
 from sklearn.utils import shuffle
 
-SCALE_X = 160
-SCALE_Y = 80
-PROCESS_SIDES = False
+SCALE_X = 80
+SCALE_Y = 40
+PROCESS_SIDES = True
 SIDE_ANGLE_OFFSET = 0.15
 
 
@@ -141,10 +142,64 @@ def create_model_3():
     return model
 
 
+def create_model_4():
+    input_shape = (SCALE_Y, SCALE_X, 3)
+
+    model = Sequential()
+
+    model.add(Lambda(lambda x: x / 128. - 1., output_shape=input_shape, input_shape=input_shape))
+
+    # Normalize data
+    model.add(BatchNormalization(input_shape=input_shape))
+
+    # Convolutional Layer 1 and Dropout
+    model.add(Convolution2D(64, 3, 3))
+    model.add(Activation('relu'))
+    model.add(Dropout(0.2))
+
+    # Conv Layer 2
+    model.add(Convolution2D(32, 3, 3))
+    model.add(Activation('relu'))
+
+    # Conv Layer 3
+    model.add(Convolution2D(16, 3, 3))
+    model.add(Activation('relu'))
+
+    # Conv Layer 4
+    model.add(Convolution2D(8, 3, 3))
+    model.add(Activation('relu'))
+
+    # Pooling
+    model.add(MaxPooling2D())
+
+    # Flatten and Dropout
+    model.add(Flatten())
+    model.add(Dropout(0.5))
+
+    # Fully Connected Layer 1 and Dropout
+    model.add(Dense(128))
+    model.add(Activation('relu'))
+    model.add(Dropout(0.5))
+
+    # FC Layer 2
+    model.add(Dense(64))
+    model.add(Activation('relu'))
+
+    # FC Layer 3
+    model.add(Dense(32))
+    model.add(Activation('relu'))
+
+    # Final FC Layer - just one output - steering angle
+    model.add(Dense(1))
+    model.summary()
+    return model
+
+
 # Read in the image, flip in necessary
 def process_image(filename, flip=False):
     # print("Reading image file {}".format(filename))
     image = cv2.imread(filename)
+    image = cv2.cvtColor(image, cv2.COLOR_RGB2HLS)
     image = cv2.resize(image, (SCALE_X, SCALE_Y))
     # cv2.imshow("image", image)
     # cv2.waitKey(0)
@@ -250,7 +305,7 @@ if __name__ == '__main__':
     else:
         learning_rate = 1e-4
         print("Training model at rate={}, flip={}".format(learning_rate, use_flip))
-        model = create_model()
+        model = create_model_4()
 
     adam = Adam(lr=learning_rate, decay=0.01)
     model.compile(optimizer=adam, loss="mse")

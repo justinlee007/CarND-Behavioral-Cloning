@@ -20,8 +20,8 @@ app = Flask(__name__)
 model = None
 prev_image_array = None
 
-SCALE_X = 160
-SCALE_Y = 80
+SCALE_X = 80
+SCALE_Y = 40
 
 
 @sio.on('telemetry')
