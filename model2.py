@@ -14,11 +14,10 @@ from keras.regularizers import l2
 from sklearn.model_selection import train_test_split
 from sklearn.utils import shuffle
 
-SCALE_X = 72
-SCALE_Y = 36
-PROCESS_SIDES = True
-SIDE_ANGLE_OFFSET = 0.1
-USE_FLIP = True
+SCALE_X = 160
+SCALE_Y = 80
+PROCESS_SIDES = False
+SIDE_ANGLE_OFFSET = 0.15
 
 
 def create_model():
@@ -170,7 +169,7 @@ def batch_generator(img_array, ste_array, batch_size=32):
         yield batch_img_array, batch_ste_array
 
 
-def read_csvfile(filename="driving_log.csv"):
+def read_csvfile(filename="driving_log.csv", use_flip=True):
     print("Reading {} and processing images".format(filename))
     # 0=img_left_file, 1=img_center_file, 2=img_right_file, 3=steering, img_left, img_center, img_right
     img_list = []
@@ -189,7 +188,7 @@ def read_csvfile(filename="driving_log.csv"):
             img_list.append(img_center)
             pose_list.append(steering)
 
-            if (PROCESS_SIDES):
+            if PROCESS_SIDES:
                 img_left = process_image(img_left_file, False)
                 img_right = process_image(img_right_file, False)
 
@@ -200,7 +199,7 @@ def read_csvfile(filename="driving_log.csv"):
                 pose_list.append(steering_left)
                 img_list.append(img_right)
                 pose_list.append(steering_right)
-            if USE_FLIP and steering != 0.0:
+            if use_flip and steering != 0.0:
                 img_center_flip = process_image(img_center_file, True)
                 img_list.append(img_center_flip)
                 pose_list.append(-1 * steering)
@@ -220,12 +219,13 @@ def calc_samples_per_epoch(array_size, batch_size):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="LeNet Architecture for GTSRB dataset")
-    parser.add_argument("-tune", action="store", dest="fine_tune", default=False, help="Start in fine-tune mode")
-    parser.add_argument("-flip", action="store", dest="use_flip", default=True, help="Flip center data")
+    parser.add_argument("-tune", action="store_true", help="Start in fine-tune mode")
+    parser.add_argument("-flip", action="store_true", help="Flip center data")
     results = parser.parse_args()
-    fine_tune = results.fine_tune
-    USE_FLIP = results.use_flip
-    pose_dict = read_csvfile()
+    fine_tune = bool(results.tune)
+    use_flip = bool(results.flip)
+
+    pose_dict = read_csvfile(use_flip=use_flip)
 
     img_array = np.array(pose_dict["img_center"])
     ste_array = np.array(pose_dict["steering"], dtype=np.float32)
@@ -240,16 +240,16 @@ if __name__ == '__main__':
     model_file = "./model.json"
     weights_file = "./model.h5"
 
-    if fine_tune is True:
+    if fine_tune:
         learning_rate = 1e-6
-        print("Fine tuning model at rate={}, flip={}".format(learning_rate, USE_FLIP))
+        print("Fine tuning model at rate={}, flip={}".format(learning_rate, use_flip))
         with open(model_file, 'r') as json_file:
             model = model_from_json(json.load(json_file))
         model.compile("adam", "mse")
         model.load_weights(weights_file)
     else:
         learning_rate = 1e-4
-        print("Training model at rate={}, flip={}".format(learning_rate, USE_FLIP))
+        print("Training model at rate={}, flip={}".format(learning_rate, use_flip))
         model = create_model()
 
     adam = Adam(lr=learning_rate, decay=0.01)

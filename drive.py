@@ -20,8 +20,8 @@ app = Flask(__name__)
 model = None
 prev_image_array = None
 
-SCALE_X = 72
-SCALE_Y = 36
+SCALE_X = 160
+SCALE_Y = 80
 
 
 @sio.on('telemetry')
@@ -39,9 +39,12 @@ def telemetry(sid, data):
     image_array = cv2.resize(asarray, (SCALE_X, SCALE_Y))
     transformed_image_array = image_array[None, :, :, :]
     # This model currently assumes that the features of the model are just the images. Feel free to change this.
-    steering_angle = 1.0 * float(model.predict(transformed_image_array, batch_size=1))
+    steering_angle = float(model.predict(transformed_image_array, batch_size=1))
     # The driving model currently just outputs a constant throttle. Feel free to edit this.
-    throttle = 0.175
+    if abs(steering_angle) > 0.05:
+        throttle = 0.1
+    else:
+        throttle = 0.2
     print("steering_angle={:.2f}, throttle={}".format(steering_angle, throttle))
     send_control(steering_angle, throttle)
 
