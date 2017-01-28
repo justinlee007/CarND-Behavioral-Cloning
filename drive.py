@@ -35,16 +35,19 @@ def telemetry(sid, data):
     # The current image from the center camera of the car
     imgString = data["image"]
     image = Image.open(BytesIO(base64.b64decode(imgString)))
-    asarray = np.asarray(image)
-    image_array = cv2.resize(asarray, (SCALE_X, SCALE_Y))
-    transformed_image_array = image_array[None, :, :, :]
+    image = np.asarray(image)
+    image = cv2.resize(image, (SCALE_X, SCALE_Y))
+    # image = cv2.cvtColor(image, cv2.COLOR_RGB2HLS)
+    # image = (image / 255.0) - 0.5
+    # image = (image / 128.0) - 1.0
+    transformed_image_array = image[None, :, :, :]
     # This model currently assumes that the features of the model are just the images. Feel free to change this.
     steering_angle = float(model.predict(transformed_image_array, batch_size=1))
     # The driving model currently just outputs a constant throttle. Feel free to edit this.
     if abs(steering_angle) > 0.05:
-        throttle = 0.1
+        throttle = 0.125
     else:
-        throttle = 0.2
+        throttle = 0.125
     print("steering_angle={:.2f}, throttle={}".format(steering_angle, throttle))
     send_control(steering_angle, throttle)
 

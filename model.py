@@ -108,12 +108,9 @@ def model_vgg():
     # Add last block to the VGG model with modified sub sampling.
     layer = model.outputs[0]
     # These layers are used for reducing the (5,10,512) sized layer into (1,5,512).
-    layer = Convolution2D(512, 3, 3, subsample=(1, 1), activation='elu', border_mode='valid', name='block6_conv1') \
-        (layer)
-    layer = Convolution2D(512, 3, 3, subsample=(1, 1), activation='elu', border_mode='same', name='block6_conv2') \
-        (layer)
-    layer = Convolution2D(512, 3, 3, subsample=(1, 1), activation='elu', border_mode='valid', name='block6_conv3') \
-        (layer)
+    layer = Convolution2D(512, 3, 3, activation='elu', name='block6_conv1')(layer)
+    layer = Convolution2D(512, 3, 3, activation='elu', border_mode='same', name='block6_conv2')(layer)
+    layer = Convolution2D(512, 3, 3, activation='elu', name='block6_conv3')(layer)
     layer = Flatten()(layer)
     layer = Dropout(.2)(layer)
     layer = Dense(1024, activation='relu', name='fc1')(layer)
