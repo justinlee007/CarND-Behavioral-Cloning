@@ -371,7 +371,7 @@ if __name__ == '__main__':
     model.compile(optimizer=adam, loss="mse")
     # model.compile(optimizer=nadam, loss="mse")
 
-    batch_size = 32
+    batch_size = 64
     samples_per_epoch = calc_samples_per_epoch(len(X_train), batch_size)
 
     history = model.fit_generator(
