@@ -19,7 +19,7 @@ from tqdm import tqdm
 
 SCALE_X = 240
 SCALE_Y = 72
-PROCESS_SIDES = True
+PROCESS_SIDES = False
 SIDE_ANGLE_OFFSET = 0.15
 
 
