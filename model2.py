@@ -27,8 +27,8 @@ def create_model():
     model = Sequential()
     input_shape = (SCALE_Y, SCALE_X, 3)
 
-    # model.add(Lambda(lambda x: (x / 128.0) - 1.0, output_shape=input_shape, input_shape=input_shape))
-    model.add(BatchNormalization(input_shape=input_shape, axis=1))
+    model.add(Lambda(lambda x: (x / 128.0) - 1.0, output_shape=input_shape, input_shape=input_shape))
+    # model.add(BatchNormalization(input_shape=input_shape, axis=1))
 
     # this applies 32 convolution filters of size 3x3 each.
     model.add(Convolution2D(32, 3, 3, input_shape=input_shape))
@@ -106,7 +106,7 @@ def create_model_3():
     input_shape = (SCALE_Y, SCALE_X, 3)
     model = Sequential()
     model.add(Lambda(lambda x: x / 255. - 0.5, input_shape=input_shape))
-    model.add(BatchNormalization(input_shape=input_shape))
+    # model.add(BatchNormalization(input_shape=input_shape))
 
     model.add(Convolution2D(3, 1, 1, init='he_normal'))
 
@@ -366,7 +366,7 @@ if __name__ == '__main__':
     else:
         learning_rate = 1e-4
         print("Training model at rate={}, flip={}".format(learning_rate, use_flip))
-        model = create_model()
+        model = create_model_3()
 
     adam = Adam(lr=learning_rate)
     nadam = Nadam(lr=learning_rate)
