@@ -1,6 +1,7 @@
 import argparse
 import base64
 import json
+import math
 from io import BytesIO
 
 import cv2
@@ -20,8 +21,8 @@ app = Flask(__name__)
 model = None
 prev_image_array = None
 
-SCALE_X = 80
-SCALE_Y = 40
+SCALE_X = 240
+SCALE_Y = 72
 
 
 @sio.on('telemetry')
@@ -36,7 +37,15 @@ def telemetry(sid, data):
     imgString = data["image"]
     image = Image.open(BytesIO(base64.b64decode(imgString)))
     image = np.asarray(image)
-    image = cv2.resize(image, (SCALE_X, SCALE_Y))
+
+    shape = image.shape
+    image = image[math.floor(shape[0] / 4):shape[0] - 25, 0:shape[1]]
+
+    image = cv2.resize(image, (SCALE_X, SCALE_Y), cv2.INTER_AREA)
+
+    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+
+    # image = cv2.resize(image, (SCALE_X, SCALE_Y))
     # image = cv2.cvtColor(image, cv2.COLOR_RGB2HLS)
     # image = (image / 255.0) - 0.5
     # image = (image / 128.0) - 1.0
@@ -45,9 +54,9 @@ def telemetry(sid, data):
     steering_angle = float(model.predict(transformed_image_array, batch_size=1))
     # The driving model currently just outputs a constant throttle. Feel free to edit this.
     if abs(steering_angle) > 0.05:
-        throttle = 0.125
+        throttle = 0.125 
     else:
-        throttle = 0.125
+        throttle = 0.175
     print("steering_angle={:.2f}, throttle={}".format(steering_angle, throttle))
     send_control(steering_angle, throttle)
 
