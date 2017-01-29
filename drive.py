@@ -43,7 +43,7 @@ def telemetry(sid, data):
 
     image = cv2.resize(image, (SCALE_X, SCALE_Y), cv2.INTER_AREA)
 
-    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    # image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
     # image = cv2.resize(image, (SCALE_X, SCALE_Y))
     # image = cv2.cvtColor(image, cv2.COLOR_RGB2HLS)
