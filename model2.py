@@ -245,7 +245,7 @@ def process_image(filename, flip=False):
     # image = img_array[20:]
 
 
-    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    # image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
     # image = (image / 255.0) - 0.5
 
     # cv2.imwrite("test.jpg", image)
