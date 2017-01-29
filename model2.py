@@ -20,15 +20,15 @@ from tqdm import tqdm
 SCALE_X = 240
 SCALE_Y = 72
 PROCESS_SIDES = True
-SIDE_ANGLE_OFFSET = 0.1
+SIDE_ANGLE_OFFSET = 0.15
 
 
 def create_model():
     model = Sequential()
     input_shape = (SCALE_Y, SCALE_X, 3)
 
-    # model.add(Lambda(lambda x: (x / 128.0) - 1.0, output_shape=input_shape, input_shape=input_shape))
-    model.add(BatchNormalization(input_shape=input_shape, axis=1))
+    model.add(Lambda(lambda x: (x / 128.0) - 1.0, output_shape=input_shape, input_shape=input_shape))
+    # model.add(BatchNormalization(input_shape=input_shape, axis=1))
 
     # this applies 32 convolution filters of size 3x3 each.
     model.add(Convolution2D(32, 3, 3, input_shape=input_shape))
@@ -245,7 +245,7 @@ def process_image(filename, flip=False):
     # image = img_array[20:]
 
 
-    # image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
     # image = (image / 255.0) - 0.5
 
     # cv2.imwrite("test.jpg", image)
@@ -371,7 +371,7 @@ if __name__ == '__main__':
     model.compile(optimizer=adam, loss="mse")
     # model.compile(optimizer=nadam, loss="mse")
 
-    batch_size = 64
+    batch_size = 96
     samples_per_epoch = calc_samples_per_epoch(len(X_train), batch_size)
 
     history = model.fit_generator(
