@@ -27,11 +27,12 @@ def create_model():
     model = Sequential()
     input_shape = (SCALE_Y, SCALE_X, 3)
 
-    model.add(Lambda(lambda x: (x / 128.0) - 1.0, output_shape=input_shape, input_shape=input_shape))
+    model.add(Lambda(lambda x: x / 255. - 0.5, input_shape=input_shape))
+    # model.add(Lambda(lambda x: (x / 128.0) - 1.0, output_shape=input_shape, input_shape=input_shape))
     # model.add(BatchNormalization(input_shape=input_shape, axis=1))
 
     # this applies 32 convolution filters of size 3x3 each.
-    model.add(Convolution2D(32, 3, 3, input_shape=input_shape))
+    model.add(Convolution2D(32, 3, 3))
     model.add(Activation('relu'))
     model.add(Convolution2D(32, 3, 3))
     model.add(Activation('relu'))
@@ -283,6 +284,7 @@ def batch_generator(img_array, ste_array, batch_size=32):
 
 def read_csvfile(filename="driving_log.csv", use_flip=True):
     print("Reading {} and processing images".format(filename))
+    # center,left,right,steering,throttle,brake,speed
     # 0=img_left_file, 1=img_center_file, 2=img_right_file, 3=steering, img_left, img_center, img_right
     img_list = []
     pose_list = []
@@ -293,8 +295,8 @@ def read_csvfile(filename="driving_log.csv", use_flip=True):
         for index, row in table:
             if index == 0:
                 continue
-            img_left_file = row[0].strip()
-            img_center_file = row[1].strip()
+            img_center_file = row[0].strip()
+            img_left_file = row[1].strip()
             img_right_file = row[2].strip()
             steering = float(row[3])
 
@@ -366,7 +368,7 @@ if __name__ == '__main__':
     else:
         learning_rate = 1e-4
         print("Training model at rate={}, flip={}".format(learning_rate, use_flip))
-        model = create_model_3()
+        model = create_model()
 
     adam = Adam(lr=learning_rate)
     nadam = Nadam(lr=learning_rate)
