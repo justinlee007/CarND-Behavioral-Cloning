@@ -304,22 +304,22 @@ def read_csvfile(filename="driving_log.csv", use_flip=True):
             img_list.append(img_center)
             pose_list.append(steering)
 
-            if steering != 0.0:
-                if PROCESS_SIDES:
-                    img_left = process_image(img_left_file, False)
-                    img_right = process_image(img_right_file, False)
+            # if steering != 0.0:
+            if PROCESS_SIDES:
+                img_left = process_image(img_left_file, False)
+                img_right = process_image(img_right_file, False)
 
-                    steering_left = steering + SIDE_ANGLE_OFFSET
-                    steering_right = steering - SIDE_ANGLE_OFFSET
+                steering_left = steering + SIDE_ANGLE_OFFSET
+                steering_right = steering - SIDE_ANGLE_OFFSET
 
-                    img_list.append(img_left)
-                    pose_list.append(steering_left)
-                    img_list.append(img_right)
-                    pose_list.append(steering_right)
-                if use_flip:
-                    img_center_flip = process_image(img_center_file, True)
-                    img_list.append(img_center_flip)
-                    pose_list.append(-1 * steering)
+                img_list.append(img_left)
+                pose_list.append(steering_left)
+                img_list.append(img_right)
+                pose_list.append(steering_right)
+            if use_flip:
+                img_center_flip = process_image(img_center_file, True)
+                img_list.append(img_center_flip)
+                pose_list.append(-1 * steering)
 
     pose_dict = {"steering": pose_list, "img_center": img_list}
     return pose_dict
