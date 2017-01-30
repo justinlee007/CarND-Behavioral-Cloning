@@ -20,7 +20,7 @@ from tqdm import tqdm
 SCALE_X = 240
 SCALE_Y = 72
 PROCESS_SIDES = True
-SIDE_ANGLE_OFFSET = 0.15
+SIDE_ANGLE_OFFSET = 0.2
 
 
 def create_model():
@@ -368,7 +368,7 @@ if __name__ == '__main__':
     else:
         learning_rate = 1e-4
         print("Training model at rate={}, flip={}".format(learning_rate, use_flip))
-        model = create_model()
+        model = create_model_3()
 
     adam = Adam(lr=learning_rate)
     nadam = Nadam(lr=learning_rate)
