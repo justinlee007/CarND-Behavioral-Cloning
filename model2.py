@@ -28,11 +28,11 @@ def create_model():
     input_shape = (SCALE_Y, SCALE_X, 3)
 
     # model.add(Lambda(lambda x: x / 255. - 0.5, input_shape=input_shape))
-    # model.add(Lambda(lambda x: (x / 128.0) - 1.0, output_shape=input_shape, input_shape=input_shape))
-    model.add(BatchNormalization(input_shape=input_shape, axis=1))
+    model.add(Lambda(lambda x: (x / 128.0) - 1.0, output_shape=input_shape, input_shape=input_shape))
+    # model.add(BatchNormalization(input_shape=input_shape, axis=1))
 
     # this applies 32 convolution filters of size 3x3 each.
-    model.add(Convolution2D(32, 3, 3))
+    model.add(Convolution2D(32, 3, 3, input_shape=input_shape))
     model.add(Activation('relu'))
     model.add(Convolution2D(32, 3, 3))
     model.add(Activation('relu'))
