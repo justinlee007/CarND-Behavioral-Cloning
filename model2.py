@@ -27,9 +27,9 @@ def create_model():
     model = Sequential()
     input_shape = (SCALE_Y, SCALE_X, 3)
 
-    model.add(Lambda(lambda x: x / 255. - 0.5, input_shape=input_shape))
+    # model.add(Lambda(lambda x: x / 255. - 0.5, input_shape=input_shape))
     # model.add(Lambda(lambda x: (x / 128.0) - 1.0, output_shape=input_shape, input_shape=input_shape))
-    # model.add(BatchNormalization(input_shape=input_shape, axis=1))
+    model.add(BatchNormalization(input_shape=input_shape, axis=1))
 
     # this applies 32 convolution filters of size 3x3 each.
     model.add(Convolution2D(32, 3, 3))
@@ -246,7 +246,7 @@ def process_image(filename, flip=False):
 
 
     # image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-    image = cv2.cvtColor(image, cv2.COLOR_RGB2HLS)
+    # image = cv2.cvtColor(image, cv2.COLOR_RGB2HLS)
 
     # image = (image / 255.0) - 0.5
 
