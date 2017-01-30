@@ -92,7 +92,7 @@ def create_model_2():
     model.add(Activation('relu'))
 
     model.add(Flatten())
-    model.add(Dense(100, input_shape=(2496,), W_regularizer=l2(0.00)))
+    model.add(Dense(100, W_regularizer=l2(0.00)))
     model.add(Activation('relu'))
 
     model.add(Dense(50, W_regularizer=l2(0.00)))
@@ -369,7 +369,7 @@ if __name__ == '__main__':
     else:
         learning_rate = 1e-4
         print("Training model at rate={}, flip={}".format(learning_rate, use_flip))
-        model = create_model_3()
+        model = create_model_2()
 
     adam = Adam(lr=learning_rate)
     nadam = Nadam(lr=learning_rate)
