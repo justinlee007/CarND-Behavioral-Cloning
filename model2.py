@@ -247,6 +247,7 @@ def process_image(filename, flip=False):
 
     # image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
     # image = cv2.cvtColor(image, cv2.COLOR_RGB2HLS)
+    image = cv2.cvtColor(image, cv2.COLOR_RGB2HSV)
 
     # image = (image / 255.0) - 0.5
 
@@ -295,31 +296,31 @@ def read_csvfile(filename="driving_log.csv", use_flip=True):
         for index, row in table:
             if index == 0:
                 continue
-            img_center_file = row[0].strip()
-            img_left_file = row[1].strip()
-            img_right_file = row[2].strip()
-            steering = float(row[3])
 
-            img_center = process_image(img_center_file, False)
-            img_list.append(img_center)
-            pose_list.append(steering)
+            if steering != 0.0:
+                img_center_file = row[0].strip()
+                img_left_file = row[1].strip()
+                img_right_file = row[2].strip()
+                steering = float(row[3])
 
-            # if steering != 0.0:
-            if PROCESS_SIDES:
-                img_left = process_image(img_left_file, False)
-                img_right = process_image(img_right_file, False)
+                img_center = process_image(img_center_file, False)
+                img_list.append(img_center)
+                pose_list.append(steering)
+                if PROCESS_SIDES:
+                    img_left = process_image(img_left_file, False)
+                    img_right = process_image(img_right_file, False)
 
-                steering_left = steering + SIDE_ANGLE_OFFSET
-                steering_right = steering - SIDE_ANGLE_OFFSET
+                    steering_left = steering + SIDE_ANGLE_OFFSET
+                    steering_right = steering - SIDE_ANGLE_OFFSET
 
-                img_list.append(img_left)
-                pose_list.append(steering_left)
-                img_list.append(img_right)
-                pose_list.append(steering_right)
-            if use_flip:
-                img_center_flip = process_image(img_center_file, True)
-                img_list.append(img_center_flip)
-                pose_list.append(-1 * steering)
+                    img_list.append(img_left)
+                    pose_list.append(steering_left)
+                    img_list.append(img_right)
+                    pose_list.append(steering_right)
+                if use_flip:
+                    img_center_flip = process_image(img_center_file, True)
+                    img_list.append(img_center_flip)
+                    pose_list.append(-1 * steering)
 
     pose_dict = {"steering": pose_list, "img_center": img_list}
     return pose_dict
