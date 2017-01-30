@@ -297,11 +297,11 @@ def read_csvfile(filename="driving_log.csv", use_flip=True):
             if index == 0:
                 continue
 
+            steering = float(row[3])
             if steering != 0.0:
                 img_center_file = row[0].strip()
                 img_left_file = row[1].strip()
                 img_right_file = row[2].strip()
-                steering = float(row[3])
 
                 img_center = process_image(img_center_file, False)
                 img_list.append(img_center)
