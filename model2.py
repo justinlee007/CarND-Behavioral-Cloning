@@ -9,7 +9,7 @@ import keras.backend.tensorflow_backend as backend
 import numpy as np
 from keras.applications.vgg16 import VGG16
 from keras.layers import Dense, Dropout, Activation, Flatten, ELU, Convolution2D, MaxPooling2D, Lambda, \
-    BatchNormalization, Input
+    Input
 from keras.models import Sequential, model_from_json, Model
 from keras.optimizers import Adam, Nadam
 from keras.regularizers import l2
@@ -159,7 +159,7 @@ def create_model_4():
     model.add(Lambda(lambda x: x / 128. - 1., output_shape=input_shape, input_shape=input_shape))
 
     # Normalize data
-    model.add(BatchNormalization(input_shape=input_shape))
+    # model.add(BatchNormalization(input_shape=input_shape))
 
     # Convolutional Layer 1 and Dropout
     model.add(Convolution2D(64, 3, 3))
@@ -369,7 +369,7 @@ if __name__ == '__main__':
     else:
         learning_rate = 1e-4
         print("Training model at rate={}, flip={}".format(learning_rate, use_flip))
-        model = create_model_vgg()
+        model = create_model_4()
 
     adam = Adam(lr=learning_rate)
     nadam = Nadam(lr=learning_rate)
