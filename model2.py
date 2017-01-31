@@ -369,7 +369,7 @@ if __name__ == '__main__':
     else:
         learning_rate = 1e-4
         print("Training model at rate={}, flip={}".format(learning_rate, use_flip))
-        model = create_model_2()
+        model = create_model_vgg()
 
     adam = Adam(lr=learning_rate)
     nadam = Nadam(lr=learning_rate)
