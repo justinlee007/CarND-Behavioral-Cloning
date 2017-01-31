@@ -1,162 +1,227 @@
+import argparse
+import csv
 import json
-from pathlib import Path
+import math
+import sys
 
-import pandas as pd
-from keras.applications.vgg16 import VGG16
-from keras.callbacks import EarlyStopping, ModelCheckpoint
-from keras.layers import Convolution2D, Input
-from keras.layers import Dropout
-from keras.layers import Flatten, Dense
-from keras.models import model_from_json, Model
+import cv2
+import keras.backend.tensorflow_backend as backend
+import numpy as np
+from keras.layers import Dense, Dropout, Activation, Flatten, Convolution2D, MaxPooling2D, Lambda
+from keras.models import Sequential, model_from_json
 from keras.optimizers import Adam
 from sklearn.model_selection import train_test_split
+from sklearn.utils import shuffle
+from tqdm import tqdm
 
-from utils import *
-
-training_files = [('./driving_log.csv')]
-validation_files = []
-
-csv_header = ['center_img', 'left_img', 'right_img', 'steering_angle', 'throttle', 'break', 'speed']
-im_paths = []
-im_steering = []
-angles = []
+SCALE_X = 240
+SCALE_Y = 72
+SIDE_ANGLE_OFFSET = 0.2
+BATCH_SIZE = 96
+EPOCHS = 10
 
 
-def get_path_and_angles_udacity(files):
-    """
-    This function takes the input Udacity data folder path and return list containing
-    image paths and steering angle
-    :param files: Loacation of log file
-    :return: im_paths, im_steering
-    """
-    im_paths = []
-    im_steering = []
-    for csv_name in files:
-        # Iterate through files in the list and read csv file using pandas
-        csv_log = pd.read_csv(csv_name, names=None)
-        angles = csv_log['steering']
-        # Read the center image filenames from csv file and append its filename and angles.
-        paths = csv_log['center']
-        for im_path, im_steer in zip(paths, angles):
-            im_path = im_path.split()
-            im_paths.append(im_path)
-            im_steering.append(im_steer)
-        # Read the left image filenames from csv file and append its filenames and angles.
-        # Const shift of -0.2 is used
-        paths = csv_log['left']
-        for im_path, im_steer in zip(paths, angles):
-            im_path = im_path.split()
-            im_paths.append(im_path)
-            im_steering.append(im_steer - 0.20)
-        # Read the right image filenames from csv file and append its filenames and angles.
-        # Const shift of 0.2 is used
-        paths = csv_log['right']
-        for im_path, im_steer in zip(paths, angles):
-            im_path = im_path.split()
-            im_paths.append(im_path)
-            im_steering.append(im_steer + 0.20)
+def create_model():
+    input_shape = (SCALE_Y, SCALE_X, 3)
 
-    return im_paths, im_steering
+    model = Sequential()
 
+    model.add(Lambda(lambda x: x / 128. - 1., output_shape=input_shape, input_shape=input_shape))
 
-train_im_paths, train_im_steering = get_path_and_angles_udacity(training_files)
-assert (len(train_im_paths) == len(train_im_steering))
-train_im_steering = np.array(train_im_steering)
-train_im_paths = np.array(train_im_paths)
-print('Number of training images read : {}'.format(train_im_steering.shape[0]))
+    # Normalize data (this never worked)
+    # model.add(BatchNormalization(input_shape=input_shape))
 
-# If seperate validation data is available, then train_test_split is not performed.
-if validation_files:
-    val_im_paths, val_im_steering = get_path_and_angles_udacity(validation_files)
-    assert (len(val_im_paths) == len(val_im_steering))
-    val_im_steering = np.array(val_im_steering)
-    val_im_paths = np.array(val_im_paths)
-    print('Number of validation images read : {}'.format(val_im_steering.shape[0]))
+    # Convolutional Layer 1 and Dropout
+    model.add(Convolution2D(64, 3, 3))
+    model.add(Activation('relu'))
+    model.add(Dropout(0.2))
 
-if validation_files:
-    X_train = np.copy(train_im_paths)
-    Y_train = np.copy(train_im_steering)
-    X_val = np.copy(val_im_paths)
-    Y_val = np.copy(val_im_steering)
-else:
-    # split the training data into training and validation
-    X_train, X_val, Y_train, Y_val = train_test_split(train_im_paths, train_im_steering, test_size=0.1, random_state=10)
+    # Conv Layer 2
+    model.add(Convolution2D(32, 3, 3))
+    model.add(Activation('relu'))
 
-batch_size = 20
-samples_per_epoch = len(X_train) / batch_size
-val_size = int(samples_per_epoch / 10.0)
-nb_epoch = 10
+    # Conv Layer 3
+    model.add(Convolution2D(16, 3, 3))
+    model.add(Activation('relu'))
 
-# Create train and validation generator
-train_datagen = BehaviourCloningDataGenerator(rescale=lambda x: x / 127.5 - 1.)
-valid_datagen = BehaviourCloningDataGenerator(rescale=lambda x: x / 127.5 - 1.)
-train_generator = train_datagen.flow_from_directory(X_train, Y_train, batch_size=batch_size, target_size=(160, 320))
-valid_generator = valid_datagen.flow_from_directory(X_val, Y_val, batch_size=batch_size, target_size=(160, 320))
+    # Conv Layer 4
+    model.add(Convolution2D(8, 3, 3))
+    model.add(Activation('relu'))
 
+    # Pooling
+    model.add(MaxPooling2D())
 
-def model_vgg():
-    """
-    Using pre-trained VGG model without top layers.
-    Reference https://blog.keras.io/building-powerful-image-classification-models-using-very-little-data.html
-    Model is trained with last four layer from VGG and with new three conv layers and 3 fully connected layers while freezing other layers.
-    :return: model
-    """
-    in_layer = Input(shape=(160, 320, 3))
-    model = VGG16(weights='imagenet', include_top=False, input_tensor=in_layer)
-    for layer in model.layers[:15]:
-        layer.trainable = False
-    # Add last block to the VGG model with modified sub sampling.
-    layer = model.outputs[0]
-    # These layers are used for reducing the (5,10,512) sized layer into (1,5,512).
-    layer = Convolution2D(512, 3, 3, activation='elu', name='block6_conv1')(layer)
-    layer = Convolution2D(512, 3, 3, activation='elu', border_mode='same', name='block6_conv2')(layer)
-    layer = Convolution2D(512, 3, 3, activation='elu', name='block6_conv3')(layer)
-    layer = Flatten()(layer)
-    layer = Dropout(.2)(layer)
-    layer = Dense(1024, activation='relu', name='fc1')(layer)
-    layer = Dropout(.2)(layer)
-    layer = Dense(256, activation='relu', name='fc2')(layer)
-    layer = Dropout(.2)(layer)
-    layer = Dense(1, activation='linear', name='predict')(layer)
+    # Flatten and Dropout
+    model.add(Flatten())
+    model.add(Dropout(0.5))
 
-    return Model(input=model.input, output=layer)
+    # Fully Connected Layer 1 and Dropout
+    model.add(Dense(128))
+    model.add(Activation('relu'))
+    model.add(Dropout(0.5))
 
+    # FC Layer 2
+    model.add(Dense(64))
+    model.add(Activation('relu'))
 
-# If model is available, load the model and train it. Learning rate is kept lower than initial learning rate
-json_file = 'model.json'
-weight_file = 'model.h5'
-if Path(json_file).is_file():
-    with open(json_file, 'r') as jfile:
-        model = model_from_json(json.loads(jfile.read()))
-    adam = Adam(lr=0.00001, beta_1=0.9, beta_2=0.999, epsilon=1e-08, decay=0.01)
-    model.compile(optimizer=adam, loss="mse")
-    model.load_weights(weight_file)
-    print("Loaded model from disk:")
+    # FC Layer 3
+    model.add(Dense(32))
+    model.add(Activation('relu'))
+
+    # Final FC Layer - just one output - steering angle
+    model.add(Dense(1))
     model.summary()
-# train from stratch
-else:
-    model = model_vgg()
-    adam = Adam(lr=0.00001, beta_1=0.9, beta_2=0.999, epsilon=1e-08, decay=0.01)
+    return model
+
+
+# Read in the image and flip if necessary
+def process_image(filename, flip=False):
+    # print("Reading image file {}".format(filename))
+    image = cv2.imread(filename)
+
+    shape = image.shape
+    # Crop off the sky and the hood of the car
+    image = image[math.floor(shape[0] / 4):shape[0] - 25, 0:shape[1]]
+    # Scale it down 25%
+    image = cv2.resize(image, (SCALE_X, SCALE_Y))
+    # HSV seems to create the greatest contrast of the road to the land/water/sky
+    image = cv2.cvtColor(image, cv2.COLOR_RGB2HSV)
+
+    # cv2.imshow("image", image)
+    # cv2.waitKey(0)
+    # cv2.destroyAllWindows()
+    if flip:
+        image = cv2.flip(image, 1)
+    return image
+
+
+def batch_generator(img_array, ste_array, batch_size=32):
+    index = 0
+    while True:
+        batch_img_array = np.ndarray(shape=(batch_size, SCALE_Y, SCALE_X, 3), dtype=float)
+        batch_ste_array = np.ndarray(shape=(batch_size), dtype=float)
+        for i in range(batch_size):
+            if index >= len(img_array):
+                index = 0
+                shuffle(img_array, ste_array)
+            batch_img_array[i] = img_array[index]
+            batch_ste_array[i] = ste_array[index]
+            index += 1
+        yield batch_img_array, batch_ste_array
+
+
+def read_csvfile(filename="driving_log.csv", use_flip=True, use_side=True):
+    print("Reading {} and processing images".format(filename))
+    img_list = []
+    pose_list = []
+    num_lines = sum(1 for line in open(filename))
+    with open(filename, "rt") as csvfile:
+        pose_reader = csv.reader(csvfile, delimiter=',')
+        table = tqdm(enumerate(pose_reader), desc="Processing Images", total=num_lines, file=sys.stdout, unit="Rows")
+        for index, row in table:
+            # column headers: center,left,right,steering,throttle,brake,speed
+            if index == 0:
+                continue
+
+            steering = float(row[3])
+            # don't use any images with 0.0 steering angle
+            if steering != 0.0:
+                img_center_file = row[0].strip()
+                img_left_file = row[1].strip()
+                img_right_file = row[2].strip()
+
+                img_center = process_image(img_center_file, False)
+                img_list.append(img_center)
+                pose_list.append(steering)
+                if use_side:
+                    img_left = process_image(img_left_file, False)
+                    img_right = process_image(img_right_file, False)
+
+                    steering_left = steering + SIDE_ANGLE_OFFSET
+                    steering_right = steering - SIDE_ANGLE_OFFSET
+
+                    img_list.append(img_left)
+                    pose_list.append(steering_left)
+                    img_list.append(img_right)
+                    pose_list.append(steering_right)
+                if use_flip:
+                    img_center_flip = process_image(img_center_file, True)
+                    img_list.append(img_center_flip)
+                    pose_list.append(-1 * steering)
+
+    pose_dict = {"steering": pose_list, "img_center": img_list}
+    return pose_dict
+
+
+# Calculate the correct number of samples per epoch based on batch size
+def calc_samples_per_epoch(array_size, batch_size):
+    num_batches = array_size / batch_size
+    # return value must be a number than can be divided by batch_size
+    samples_per_epoch = math.ceil((num_batches / batch_size) * batch_size)
+    samples_per_epoch = samples_per_epoch * batch_size
+    return samples_per_epoch
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description="CNN Architecture for Udacity Simulator image dataset")
+    parser.add_argument("-tune", action="store_true", help="Start in fine-tune mode")
+    parser.add_argument("-flip", action="store_true", help="Flip center data")
+    parser.add_argument("-side", action="store_true", help="Use left and right side images")
+    results = parser.parse_args()
+    fine_tune = bool(results.tune)
+    use_flip = bool(results.flip)
+    use_side = bool(results.side)
+
+    pose_dict = read_csvfile(use_flip=use_flip, use_side=use_side)
+
+    img_array = np.array(pose_dict["img_center"])
+    ste_array = np.array(pose_dict["steering"], dtype=np.float32)
+    print("total entries={} size={}".format(len(img_array), sys.getsizeof(img_array)))
+    shuffle(img_array, ste_array)
+
+    X_train, X_val, Y_train, Y_val = train_test_split(img_array, ste_array, test_size=0.1, random_state=10)
+    print("X_train={}, X_val={}, Y_train={}, Y_val={}".format(len(X_train), len(X_val), len(Y_train), len(Y_val)))
+
+    config = backend.tf.ConfigProto()
+    config.gpu_options.allow_growth = True
+
+    model_file = "./model.json"
+    weights_file = "./model.h5"
+
+    if fine_tune:
+        learning_rate = 1e-6
+        print("Fine tuning model at rate={}, flip={}".format(learning_rate, use_flip))
+        with open(model_file, 'r') as json_file:
+            model = model_from_json(json.load(json_file))
+        model.compile("adam", "mse")
+        model.load_weights(weights_file)
+    else:
+        learning_rate = 1e-4
+        print("Training model at rate={}, flip={}".format(learning_rate, use_flip))
+        model = create_model()
+
+    adam = Adam(lr=learning_rate)
     model.compile(optimizer=adam, loss="mse")
+
+    samples_per_epoch = calc_samples_per_epoch(len(X_train), BATCH_SIZE)
+
+    history = model.fit_generator(
+        batch_generator(X_train, Y_train, batch_size=BATCH_SIZE),
+        samples_per_epoch=samples_per_epoch,
+        nb_epoch=EPOCHS,
+        validation_data=batch_generator(X_val, Y_val, batch_size=BATCH_SIZE),
+        nb_val_samples=len(X_val))
+
+    # Evaluate the accuracy of the model using the entire set
+    test_loss = model.evaluate_generator(
+        generator=batch_generator(img_array, ste_array),  # validation data generator
+        val_samples=calc_samples_per_epoch(len(img_array), BATCH_SIZE),  # How many batches to run in one epoch
+    )
+    print("Test Loss={}".format(test_loss))
+
     model_json = model.to_json()
-    with open(json_file, 'w') as f:
-        json.dump(model_json, f)
-    model.summary()
-
-# Save the best model as and when created
-checkpoint = ModelCheckpoint(weight_file,
-                             monitor='val_loss',
-                             verbose=1,
-                             save_best_only=True,
-                             save_weights_only=False,
-                             mode='auto')
-# Terminate condition if model does not improve
-early_stopping = EarlyStopping(monitor='val_loss', min_delta=0, patience=10, verbose=1, mode='auto')
-
-# https://keras.io/preprocessing/image/
-# Train the model with generator
-history = model.fit_generator(train_generator,
-                              samples_per_epoch=X_train.shape[0],
-                              nb_epoch=nb_epoch,
-                              validation_data=valid_generator,
-                              nb_val_samples=val_size, verbose=1, callbacks=[checkpoint, early_stopping])
+    with open(model_file, "w") as json_file:
+        json.dump(model_json, json_file)
+    print("Saved {} to disk".format(model_file))
+    model.save_weights(weights_file)
+    print("Saved {} to disk".format(weights_file))

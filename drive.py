@@ -25,6 +25,17 @@ SCALE_X = 240
 SCALE_Y = 72
 
 
+def process_image(image):
+    shape = image.shape
+    # Crop off the sky and the hood of the car
+    image = image[math.floor(shape[0] / 4):shape[0] - 25, 0:shape[1]]
+    # Scale it down 25%
+    image = cv2.resize(image, (SCALE_X, SCALE_Y))
+    # HSV seems to create the greatest contrast of the road to the land/water/sky
+    image = cv2.cvtColor(image, cv2.COLOR_RGB2HSV)
+    return image
+
+
 @sio.on('telemetry')
 def telemetry(sid, data):
     # The current steering angle of the car
@@ -38,26 +49,20 @@ def telemetry(sid, data):
     image = Image.open(BytesIO(base64.b64decode(imgString)))
     image = np.asarray(image)
 
-    shape = image.shape
-    image = image[math.floor(shape[0] / 4):shape[0] - 25, 0:shape[1]]
+    image = process_image(image)
 
-    image = cv2.resize(image, (SCALE_X, SCALE_Y))
-
-    # image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-    # image = cv2.cvtColor(image, cv2.COLOR_RGB2HLS)
-    image = cv2.cvtColor(image, cv2.COLOR_RGB2HSV)
-
-    # image = (image / 255.0) - 0.5
-    # image = (image / 128.0) - 1.0
     transformed_image_array = image[None, :, :, :]
     # This model currently assumes that the features of the model are just the images. Feel free to change this.
     steering_angle = float(model.predict(transformed_image_array, batch_size=1))
-    # The driving model currently just outputs a constant throttle. Feel free to edit this.
+
+    # Go slow in general and slow down even more while going through turns
     if abs(steering_angle) > 0.05:
-        throttle = 0.1
+        # 0.125 ~ 15 MPH
+        throttle = 0.125
     else:
-        throttle = 0.15
-    print("steering_angle={:.2f}, throttle={}".format(steering_angle, throttle))
+        # 0.175 ~ 20 MPH
+        throttle = 0.175
+    print("steering_angle={:.3f}, throttle={}".format(steering_angle, throttle))
     send_control(steering_angle, throttle)
 
 
