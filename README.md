@@ -63,6 +63,8 @@ Finally, I downsized the image 25% and converted from RGB to HSV (240x72):
 
 ![](sample_convert.jpg)
 
+I tried regular RGB, BGR, HLS and HSV.  I went with HSV because it seemed to create the greatest contrast of the road to the land, water and sky.
+
 I gathered all the processed images in-memory.  The MacBook and AWS instance I used with this project have many GB of RAM, but the AWS instance only has 4GB of video memory.  For this reason, I used a python generator to process batches of 92 images at a time.
 
 I added flags in the argument parser for flip and side.  The flip flag will use the center image and angle and flip it with the reverse angle.  The side flag is used to process the side images (or not).  The last tuning I did was to not include any images that had a 0.0 steering angle.  The total number of images in memory was 43236 with a size of 2.24 GB.
@@ -73,7 +75,7 @@ If using the left and right side images, the corresponding steering angle is adj
 
 I broke the set of images and angles up into training and validation, with 1% going toward the validation set.  For the above images, that was 38912 training and 4324 validation.
 
-For my neural net, I started using the "VGG-like convnet" described [here](https://keras.io/getting-started/sequential-model-guide/) but could never get past Turn 1.  Then I looked around online at the NVIDIA documentation and at other students to see how they created models.  In the end, I went with this model:
+For my neural net, I started using the "VGG-like convnet" described [here](https://keras.io/getting-started/sequential-model-guide/) but could never get past Turn 3.  Then I looked around online at the NVIDIA documentation to see how they created models.  In the end, I went with this model:
 ```
 ____________________________________________________________________________________________________
 Layer (type)                     Output Shape          Param #     Connected to
