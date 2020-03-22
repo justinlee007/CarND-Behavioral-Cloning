@@ -12,6 +12,7 @@ __pycache__/
 *.so
 
 # Distribution / packaging
+model.h5
 .Python
 env/
 build/
